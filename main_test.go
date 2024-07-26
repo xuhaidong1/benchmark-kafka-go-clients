@@ -1,129 +1,64 @@
 package main
 
 import (
-	"flag"
+	"context"
 	"fmt"
-
-	"github.com/gguridi/benchmark-kafka-go-clients/confluent"
+	"github.com/gguridi/benchmark-kafka-go-clients/config"
+	"github.com/gguridi/benchmark-kafka-go-clients/franzgo"
 	"github.com/gguridi/benchmark-kafka-go-clients/kafkago"
 	"github.com/gguridi/benchmark-kafka-go-clients/sarama"
 	. "github.com/onsi/ginkgo"
-
-	. "github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"strconv"
+	"time"
 )
 
 var _ = Describe("Benchmarks", func() {
-
-	It("checks lag", func() {
-		flag.Parse()
-		consumer := confluent.NewConsumer(viper.GetString("kafka.brokers"), true)
-		confluent.PreparePoll(consumer, 1)()
-		Expect(confluent.Lag(consumer)).To(Equal(NumMessages))
-	})
-
-	Measure("producer", func(b Benchmarker) {
-		flag.Parse()
-		name := fmt.Sprintf("%s producing %d messages of %d bytes size", Library, NumMessages, MessageSize)
-		switch Library {
-		case "confluent":
-			producer := confluent.NewProducer(viper.GetString("kafka.brokers"))
-			process := confluent.Prepare(producer, GenMessage(), NumMessages)
-			b.Time(name, func() {
-				process()
-				<-confluent.Done
-			})
-			producer.Close()
-			break
-		case "sarama":
-			producer := sarama.NewProducer(viper.GetString("kafka.brokers"))
-			process := sarama.Prepare(producer, GenMessage(), NumMessages)
-			b.Time(name, func() {
-				process()
-				<-sarama.Done
-			})
-			if err := producer.Close(); err != nil {
-				log.WithError(err).Panic("Unable to close the producer")
-			}
-			break
-		case "kafkago":
-			writer := kafkago.NewProducer(viper.GetString("kafka.brokers"))
-			process := kafkago.Prepare(writer, GenMessage(), NumMessages)
+	Context("NumMessages:1000 MessageSize:100", func() {
+		NumMessages = 1000
+		MessageSize = 100
+		Measure("NumMessages:"+strconv.Itoa(NumMessages)+"MessageSize:"+strconv.Itoa(MessageSize)+"sarama", func(b Benchmarker) {
+			Library = "sarama"
+			name := fmt.Sprintf("%s producing %d messages of %d bytes size", Library, NumMessages, MessageSize)
+			br := sarama.NewBenchWrapper()
+			process := br.Prepare(config.GenMessage(MessageSize), NumMessages)
 			b.Time(name, func() {
 				process()
 			})
-			if err := writer.Close(); err != nil {
-				log.WithError(err).Panic("Unable to close the producer")
-			}
-			break
-		default:
-			log.Panicf("Unable to find the libray %+v", Library)
-		}
-	}, 3)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+			br.WaitSignal(ctx, int64(NumMessages))
+			cancel()
+		}, 3)
 
-	Context("prepopulate", func() {
-
-		var (
-			initialised = false
-		)
-
-		BeforeEach(func() {
-			if !initialised {
-				log.Infof("Prepopulating Kafka with %d messages of %d bytes", NumMessages, MessageSize)
-				producer := sarama.NewProducer(viper.GetString("kafka.brokers"))
-				process := sarama.Prepare(producer, GenMessage(), int(float64(NumMessages)*1.5))
+		Measure("NumMessages:"+strconv.Itoa(NumMessages)+"MessageSize:"+strconv.Itoa(MessageSize)+"kafkago", func(b Benchmarker) {
+			Library = "kafkago"
+			name := fmt.Sprintf("%s producing %d messages of %d bytes size", Library, NumMessages, MessageSize)
+			br := kafkago.NewBenchWrapper()
+			process := br.Prepare(config.GenMessage(MessageSize), NumMessages)
+			b.Time(name, func() {
 				process()
-				<-sarama.Done
-				producer.Close()
-				log.Infof("Finished prepopulating Kafka")
-			}
-			initialised = true
-		})
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+			br.WaitSignal(ctx, int64(NumMessages))
+			cancel()
+		}, 3)
 
-		Measure("consumer", func(b Benchmarker) {
-			flag.Parse()
-			name := fmt.Sprintf("%s consuming %d messages", Library, NumMessages)
-			switch Library {
-			case "confluent-poll":
-				consumer := confluent.NewConsumer(viper.GetString("kafka.brokers"), true)
-				process := confluent.PreparePoll(consumer, NumMessages)
-				b.Time(name, func() {
-					process()
-				})
-				consumer.Close()
-				break
-			case "confluent-channel":
-				consumer := confluent.NewConsumer(viper.GetString("kafka.brokers"), false)
-				process := confluent.PrepareChannel(consumer, NumMessages)
-				b.Time(name, func() {
-					process()
-				})
-				consumer.Close()
-				break
-			case "sarama":
-				consumer := sarama.NewConsumer(viper.GetString("kafka.brokers"), NumMessages)
-				process := sarama.PrepareConsume(consumer)
-				b.Time(name, func() {
-					process()
-				})
-				if err := consumer.Client.Close(); err != nil {
-					log.WithError(err).Panic("Unable to close the consumer")
-				}
-				break
-			case "kafkago":
-				reader := kafkago.NewReader(viper.GetString("kafka.brokers"))
-				process := kafkago.PrepareReader(reader, NumMessages)
-				b.Time(name, func() {
-					process()
-				})
-				if err := reader.Close(); err != nil {
-					log.WithError(err).Panic("Unable to close the consumer")
-				}
-				break
-			default:
-				log.Panicf("Unable to find the libray %+v", Library)
-			}
-		}, 1)
+		Measure("NumMessages:"+strconv.Itoa(NumMessages)+"MessageSize:"+strconv.Itoa(MessageSize)+"franzgo", func(b Benchmarker) {
+			Library = "franzgo"
+			name := fmt.Sprintf("%s producing %d messages of %d bytes size", Library, NumMessages, MessageSize)
+			br := franzgo.NewBenchWrapper()
+			process := br.Prepare(config.GenMessage(MessageSize), NumMessages)
+			b.Time(name, func() {
+				process()
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+			br.WaitSignal(ctx, int64(NumMessages))
+			cancel()
+		}, 3)
 	})
 })
+
+var MessageSizeNum = map[int][]int{
+	1024:  []int{1000, 10000, 100000, 1000000},
+	5120:  []int{100, 1000, 10000, 100000, 1000000},
+	10240: []int{100, 1000, 10000, 100000}, //max 1G
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/types"
@@ -54,8 +55,14 @@ func (reporter *JSONReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 		}
 
 		data, _ := json.Marshal(report)
-		f, _ := os.Create("results.json")
-		f.WriteString(string(data))
+		f, err := os.OpenFile("results.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			panic(err)
+		}
+		_, err = f.WriteString(time.Now().Format("2006-01-02 15:04:05") + string(data) + "\n")
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
