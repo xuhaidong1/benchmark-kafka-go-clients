@@ -48,7 +48,6 @@ func (b *BenchWrapper) Prepare(message []byte, numMessages int) func() {
 }
 
 func (b *BenchWrapper) PrepareWithPrometheus(message []byte, numMessages int) func() {
-	b.Cli.Async = false
 	length := strconv.Itoa(len(message))
 
 	log.Infof("Preparing to send message of %d bytes %d times", len(message), numMessages)
@@ -79,17 +78,14 @@ type BenchWrapper struct {
 }
 
 func (b *BenchWrapper) PrepareBench(messageSize int) func() {
-	b.Cli.Async = false
-	log.Infof("Preparing to send message of %d bytes", messageSize)
+	log.Infof("kafkago Preparing to send message of %d bytes", messageSize)
 	return func() {
-		go func() {
-			err := b.Cli.WriteMessages(context.Background(), kafkago.Message{Value: config.GenMessage(messageSize)})
-			if err != nil {
-				log.WithError(err).Panic("Unable to deliver the message")
-			} else {
-				atomic.AddInt64(&b.SuccessNum, 1)
-			}
-		}()
+		err := b.Cli.WriteMessages(context.Background(), kafkago.Message{Value: config.GenMessage(messageSize)})
+		if err != nil {
+			log.WithError(err).Println("Unable to deliver the message")
+		} else {
+			atomic.AddInt64(&b.SuccessNum, 1)
+		}
 	}
 }
 

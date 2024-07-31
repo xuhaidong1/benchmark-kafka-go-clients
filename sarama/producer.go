@@ -73,7 +73,7 @@ func (b *BenchWrapper) PrepareWithPrometheus(message []byte, numMessages int) fu
 }
 
 func NewClient(brokers []string) sarama.Client {
-	log.Infof("Connecting to %s", brokers)
+	//log.Infof("Connecting to %s", brokers)
 	cli, err := sarama.NewClient(brokers, saramaConfig())
 	if err != nil {
 		panic(err)
@@ -82,11 +82,11 @@ func NewClient(brokers []string) sarama.Client {
 }
 
 func (b *BenchWrapper) PrepareBench(messageSize int) func() {
-	log.Infof("Preparing to send message of %d bytes", messageSize)
+	// log.Infof("sarama Preparing to send message of %d bytes", messageSize)
 
 	go func() {
 		for err := range b.Producer.Errors() {
-			log.WithError(err).Panic("Unable to deliver the message")
+			log.WithError(err).Println("Unable to deliver the message")
 		}
 	}()
 
@@ -111,7 +111,6 @@ func saramaConfig() *sarama.Config {
 	cfg.Producer.RequiredAcks = sarama.WaitForLocal
 	cfg.Producer.Return.Successes = true
 	cfg.Producer.Flush.Frequency = time.Duration(100) * time.Millisecond
-	sarama.MaxRequestSize = 999000
 	cfg.Consumer.Return.Errors = true
 	cfg.Consumer.Offsets.AutoCommit.Enable = true
 	cfg.Consumer.Group.Session.Timeout = time.Minute
@@ -133,7 +132,7 @@ func (b *BenchWrapper) WaitSignal(ctx context.Context, numMessages int64) {
 		case <-b.Producer.Successes():
 			atomic.AddInt64(&b.SuccessNum, 1)
 			if atomic.CompareAndSwapInt64(&b.SuccessNum, numMessages, int64(0)) {
-				log.Infof("Sent %d messages... stopping...", numMessages)
+				//log.Infof("Sent %d messages... stopping...", numMessages)
 				<-b.Done
 				if err := b.Producer.Close(); err != nil {
 					log.WithError(err).Panic("Unable to close the producer")

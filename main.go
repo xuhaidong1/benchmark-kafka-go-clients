@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"github.com/gguridi/benchmark-kafka-go-clients/config"
 	"github.com/gguridi/benchmark-kafka-go-clients/franzgo"
@@ -31,8 +32,8 @@ var (
 func init() {
 	rand.Seed(time.Now().UnixNano())
 	//flag.StringVar(&Library, "library", "", "Library to use for this benchmark")
-	//flag.IntVar(&NumMessages, "num", 1000, "Number of messages to send")
-	//flag.IntVar(&MessageSize, "size", 1000, "Number of messages to send")
+	flag.IntVar(&NumMessages, "num", 1000, "Number of messages to send")
+	flag.IntVar(&MessageSize, "size", 1000, "Number of messages to send")
 }
 
 func main() {

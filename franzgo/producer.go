@@ -7,6 +7,7 @@ import (
 	"github.com/gguridi/benchmark-kafka-go-clients/prmths"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"hash/fnv"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -17,11 +18,28 @@ var (
 )
 
 func NewClient(brokers []string) (*kgo.Client, error) {
+
+	//	kgo.StickyKeyPartitioner(kgo.SaramaCompatHasher(fnv32a))
+	//
+	// Where fnv32a is a function returning a new 32 bit fnv-1a hasher.
+	//
+	//	func fnv32a(b []byte) uint32 {
+	//		h := fnv.New32a()
+	//		h.Reset()
+	//		h.Write(b)
+	//		return h.Sum32()
+	//	}
 	cli, err := kgo.NewClient([]kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.RequiredAcks(kgo.LeaderAck()),
 		kgo.ProduceRequestTimeout(time.Minute),
 		kgo.DisableIdempotentWrite(),
+		kgo.RecordPartitioner(kgo.StickyKeyPartitioner(kgo.SaramaCompatHasher(func(b []byte) uint32 {
+			h := fnv.New32a()
+			h.Reset()
+			h.Write(b)
+			return h.Sum32()
+		}))),
 	}...)
 
 	if err != nil {
@@ -123,4 +141,11 @@ func (b *BenchWrapper) WaitSignal(ctx context.Context, numMessages int64) {
 			}
 		}
 	}
+}
+
+func fnv32a(b []byte) uint32 {
+	h := fnv.New32a()
+	h.Reset()
+	h.Write(b)
+	return h.Sum32()
 }

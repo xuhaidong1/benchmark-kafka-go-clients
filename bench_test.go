@@ -11,9 +11,11 @@ import (
 	"time"
 )
 
+var bms = 1000 // 1000 10000 100000
+
 func BenchmarkFranzgo(b *testing.B) {
 	br := franzgo.NewBenchWrapper()
-	f := br.PrepareBench(100)
+	f := br.PrepareBench(bms)
 	var sentnum int64
 	b.ResetTimer()
 
@@ -24,7 +26,7 @@ func BenchmarkFranzgo(b *testing.B) {
 
 	b.StopTimer()
 	br.Done <- struct{}{}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	br.WaitSignal(ctx, sentnum)
 	fmt.Println("BenchmarkFranzgo sentnum", sentnum)
 	cancel()
@@ -32,7 +34,7 @@ func BenchmarkFranzgo(b *testing.B) {
 
 func BenchmarkKafkago(b *testing.B) {
 	br := kafkago.NewBenchWrapper()
-	f := br.PrepareBench(100)
+	f := br.PrepareBench(bms)
 	var sentnum int64
 	b.ResetTimer()
 
@@ -43,7 +45,7 @@ func BenchmarkKafkago(b *testing.B) {
 
 	b.StopTimer()
 	br.Done <- struct{}{}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	br.WaitSignal(ctx, sentnum)
 	fmt.Println("BenchmarkKafkago sentnum", sentnum)
 	cancel()
@@ -51,7 +53,7 @@ func BenchmarkKafkago(b *testing.B) {
 
 func BenchmarkSarama(b *testing.B) {
 	br := sarama.NewBenchWrapper()
-	f := br.PrepareBench(100)
+	f := br.PrepareBench(bms)
 	var sentnum int64
 	b.ResetTimer()
 
@@ -62,8 +64,12 @@ func BenchmarkSarama(b *testing.B) {
 
 	b.StopTimer()
 	br.Done <- struct{}{}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 	br.WaitSignal(ctx, sentnum)
 	fmt.Println("BenchmarkSarama sentnum", sentnum)
 	cancel()
 }
+
+// go test -bench=^BenchmarkSarama$ . -benchmem -cpuprofile=sarama_cpu.pprof
+//go test -bench=^BenchmarkKafkago$ -benchtime=60s . -benchmem -cpuprofile=kafkago_cpu.pprof
+//go test -bench=^BenchmarkFranzgo$ -benchtime=60s . -benchmem -cpuprofile=franzgo_cpu.pprof
